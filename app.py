@@ -124,8 +124,8 @@ def procesar_escucha_digital(texto, key):
     "{texto[:15000]}"
     """
     
-    response = client.models.generate_content(
-        model='gemini-2.0-flash',
+response = client.models.generate_content(
+        model='gemini-3.8-flash',
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json"
