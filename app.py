@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import json
-import os
+import io
 from google import genai
 from google.genai import types
 
@@ -10,96 +10,124 @@ from google.genai import types
 # CONFIGURACIÓN DE LA PÁGINA
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Escucha Digital - Alcaldía de Santa Marta",
+    page_title="Escucha Digital Avanzada - Alcaldía de Santa Marta",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilo visual personalizado
 st.markdown("""
     <style>
     .main-header { font-size:26px; font-weight:bold; color:#1B365D; }
     .sub-header { font-size:16px; color:#555555; }
-    .card-metric { background-color:#F4F6F9; padding:15px; border-radius:10px; border-left:5px solid #1B365D; }
+    .card-box { background-color:#F4F6F9; padding:15px; border-radius:10px; border-left:5px solid #1B365D; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<p class="main-header">📊 Sistema de Escucha Digital Política</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Monitoreo de Favorabilidad, Gestión y Focos Críticos | Distrito de Santa Marta</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">📊 Sistema Avanzado de Escucha Digital Política</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Scraping, Procesamiento Masivo, Descarga en Excel y Analítica de Sentimiento | Santa Marta</p>', unsafe_allow_html=True)
 st.divider()
 
 # -----------------------------------------------------------------------------
-# BARRA LATERAL: CONFIGURACIÓN
+# BARRA LATERAL: CONFIGURACIÓN Y API KEY
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.header("⚙️ Configuración")
-    
-    # API Key de Gemini
+    st.header("⚙️ Configuración del Sistema")
     api_key = st.text_input("Gemini API Key:", type="password", help="Ingresa tu clave de API de Google AI Studio")
     
     st.markdown("---")
-    st.subheader("📌 Parámetros de Análisis")
-    plataforma = st.selectbox("Plataforma de Origen:", ["Facebook", "X (Twitter)", "Instagram", "Portal de Noticias", "WhatsApp (Dark Social)"])
-    territorio = st.selectbox("Colectivo / Zona Prioritaria:", ["Todo el Distrito", "Localidad 1 (Cultural-Tylona)", "Localidad 2 (Histórica-Rodrigo de Bastidas)", "Localidad 3 (Turística-Perla del Caribe)", "Zona Rural / Corregimientos"])
+    st.subheader("📌 Parámetros Territorial")
+    plataforma = st.selectbox("Canal Principal:", ["Multiplataforma (Excel/Batch)", "Facebook", "X (Twitter)", "Instagram", "WhatsApp / Dark Social"])
+    territorio = st.selectbox("Zona de Cobertura:", ["Todo el Distrito", "Localidad 1 (Cultural-Tylona)", "Localidad 2 (Histórica-Rodrigo de Bastidas)", "Localidad 3 (Turística-Perla del Caribe)", "Zona Rural / Corregimientos"])
 
 # -----------------------------------------------------------------------------
-# SECCIÓN PRINCIPAL DE ENTRADA DE DATOS
+# MÓDULO DE CARGA Y SCRAPING DE DATOS
 # -----------------------------------------------------------------------------
-col_input1, col_input2 = st.tabs(["🔗 Análisis por URL / Enlace", "📝 Análisis de Texto Directo (Dark Social)"])
+st.subheader("📥 1. Ingesta de Datos (Individual o Carga Masiva)")
 
-with col_input1:
-    url_input = st.text_input("Ingresa la URL de la publicación o noticia:", placeholder="https://www.facebook.com/...")
-    text_from_url = st.text_area("Comentarios o cuerpo extraído de la URL (si no usas scraper automático):", height=150, placeholder="Pega aquí los comentarios o el texto capturado de la publicación...")
+tab1, tab2 = st.tabs(["📁 Cargar Archivo (Excel / CSV / TXT)", "✍️ Entrada Manual Directa"])
 
-with col_input2:
-    text_direct_input = st.text_area("Pega aquí el texto, reporte o conversación de WhatsApp/Telegram:", height=200, placeholder="Ejemplo: Cadena reportando falta de agua en Mamatoco o quejas de alumbrado público...")
+df_comentarios = None
 
-# Consolidar entrada
-contenido_a_analizar = text_from_url if text_from_url else text_direct_input
+with tab1:
+    uploaded_file = st.file_uploader(
+        "Sube un archivo Excel (.xlsx), CSV (.csv) o Texto (.txt) con URLs o comentarios:", 
+        type=["xlsx", "csv", "txt"]
+    )
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.xlsx'):
+                df_input = pd.read_excel(uploaded_file)
+            elif uploaded_file.name.endswith('.csv'):
+                df_input = pd.read_csv(uploaded_file)
+            else:
+                string_data = uploaded_file.read().decode("utf-8")
+                lines = [line.strip() for line in string_data.split("\n") if line.strip()]
+                df_input = pd.DataFrame({"Comentarios_o_URL": lines})
+            
+            st.success(f"📂 Archivo cargado exitosamente. Se detectaron {len(df_input)} registros.")
+            st.dataframe(df_input.head(5), use_container_width=True)
+            
+            # Unificar texto para el análisis
+            col_target = st.selectbox("Selecciona la columna que contiene los comentarios o URLs:", df_input.columns)
+            texto_consolidado = " ".join(df_input[col_target].astype(str).tolist())
+            df_comentarios = df_input
+        except Exception as e:
+            st.error(f"Error al leer el archivo: {e}")
 
-btn_analizar = st.button("🚀 Procesar y Analizar Escucha Digital", type="primary", use_container_width=True)
+with tab2:
+    texto_manual = st.text_area(
+        "Pega aquí directamente las URLs, lista de comentarios o cadenas de WhatsApp:",
+        height=150,
+        placeholder="Ejemplo:\n- En Mamatoco llevamos 3 días sin agua @AlcaldiaSM\n- La extorsión en el Mercado Público está insostenible..."
+    )
+    if texto_manual.strip():
+        lines = [l.strip() for l in texto_manual.split("\n") if l.strip()]
+        df_comentarios = pd.DataFrame({"Comentario": lines})
+        texto_consolidado = texto_manual
+
+btn_procesar = st.button("🚀 Ejecutar Scraping, Procesar y Analizar Escucha Digital", type="primary", use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN DE ANÁLISIS CON GEMINI API
+# FUNCIÓN MOTOR NLP (GEMINI 1.5 FLASH)
 # -----------------------------------------------------------------------------
-def analizar_escucha_digital(texto, key_api, canal, zona):
-    client = genai.Client(api_key=key_api)
+def procesar_escucha_digital(texto, key):
+    # Iniciar cliente oficial con el modelo gemini-1.5-flash
+    client = genai.Client(api_key=key)
     
-    prompt_sistema = f"""
-    Actúas como un experto en Ciencia de Datos Política y Social Listening especializado en el contexto de Santa Marta, Magdalena, Colombia.
-    Analiza el siguiente conjunto de texto/comentarios provenientes de {canal} enfocado en la zona {zona}.
+    prompt = f"""
+    Actúas como un experto en Ciencia de Datos Política y Social Listening especializado en el contexto socio-político de Santa Marta, Magdalena, Colombia.
+    Analiza el siguiente conjunto masivo de texto, publicaciones y comentarios en {plataforma} enfocados en {territorio}.
     
-    Debes tener en cuenta el lenguaje local samario/costeño, la ironía (ejemplo: "excelente servicio" cuando se van la luz o el agua) y las problemáticas principales del distrito:
-    1. Servicios Públicos (ESSMAR, Agua potable, Basuras/Atesa, Alcantarillado, Energía/Air-e).
-    2. Seguridad (Extorsión, robos, sicariato, orden público).
-    3. Movilidad e Infraestructura (Malla vial/huecos, mototaxismo, obras públicas).
-    4. Turismo y Economía (Rodadero, vendedores informales, precios).
-    5. Gestión Institucional (Alcalde Carlos Pinedo, gobernanza, contratación).
+    Debes considerar el contexto local samario (falta de agua, ESSMAR, basuras Atesa, extorsión, movilidad, obras, gestión del Alcalde Carlos Pinedo) y detectar ironía/sarcasmo costeño.
     
-    DEBES DEVOLVER UNICAMENTE UN OBJETO JSON VALIDO CON LA SIGUIENTE ESTRUCTURA (SIN MARKDOWN DE CODIGO ```json):
+    DEBES RETORNAR ÚNICAMENTE UN JSON VÁLIDO CON ESTA ESTRUCTURA EXACTA (SIN NINGÚN BLOQUE MARKDOWN):
     {{
-        "favorabilidad_neta": 0,  // Porcentaje entre -100 (muy negativo) y +100 (muy positivo)
+        "favorabilidad_neta": 0,
         "distribucion_sentimiento": {{
-            "Positivo": 0,  // Porcentaje (0 a 100)
-            "Negativo": 0,  // Porcentaje (0 a 100)
-            "Neutro": 0     // Porcentaje (0 a 100)
+            "Positivo": 0,
+            "Negativo": 0,
+            "Neutro": 0
         }},
         "focos_criticos": [
-            {{"categoria": "Nombre Categoria", "menciones_pct": 0}}
+            {{"categoria": "Servicios Públicos (Agua/Basuras)", "menciones_pct": 0}},
+            {{"categoria": "Seguridad y Extorsión", "menciones_pct": 0}},
+            {{"categoria": "Malla Vial y Movilidad", "menciones_pct": 0}},
+            {{"categoria": "Turismo e Informalidad", "menciones_pct": 0}},
+            {{"categoria": "Gestión Institucional", "menciones_pct": 0}}
         ],
-        "nivel_de_alerta_crisis": 1, // Escala de 1 (Bajo/Normal) a 5 (Crisis Crítica/Protestas)
-        "resumen_ejecutivo": "Texto conciso explicando la posición dominante del público y el motivo de la insatisfacción o apoyo.",
-        "recomendacion_estrategica": "Sugerencia concreta de respuesta comunicacional u operativa para la Alcaldía."
+        "nivel_de_alerta_crisis": 1,
+        "resumen_ejecutivo": "Síntesis clara de la opinión de la ciudadanía.",
+        "recomendacion_estrategica": "Plan de acción comunicacional u operativo recomendado."
     }}
     
-    TEXTO A ANALIZAR:
-    "{texto}"
+    TEXTO A EVALUAR:
+    "{texto[:15000]}"
     """
     
     response = client.models.generate_content(
         model='gemini-1.5-flash',
-        contents=prompt_sistema,
+        contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json"
         )
@@ -108,85 +136,104 @@ def analizar_escucha_digital(texto, key_api, canal, zona):
     return json.loads(response.text)
 
 # -----------------------------------------------------------------------------
-# EJECUCIÓN Y DESPLEGABLE DE RESULTADOS
+# RESULTADOS Y DESCARGA DE EXCEL
 # -----------------------------------------------------------------------------
-if btn_analizar:
+if btn_procesar:
     if not api_key:
-        st.error("⚠️ Por favor ingresa tu API Key de Gemini en la barra lateral para continuar.")
-    elif not contenido_a_analizar.strip():
-        st.warning("⚠️ Por favor ingresa el texto de los comentarios o la captura para realizar el análisis.")
+        st.error("⚠️ Por favor ingresa tu Gemini API Key en la barra lateral.")
+    elif df_comentarios is None or df_comentarios.empty:
+        st.warning("⚠️ Debes subir un archivo o ingresar texto para analizar.")
     else:
-        with st.spinner("⏳ Procesando lenguaje natural, detectando sarcasmo costeño y calculando métricas..."):
+        with st.spinner("⏳ Procesando datos, aplicando modelos NLP y estructurando informe..."):
             try:
-                resultado = analizar_escucha_digital(contenido_a_analizar, api_key, plataforma, territorio)
+                res = procesar_escucha_digital(texto_consolidado, api_key)
                 
-                st.success("✅ Análisis finalizado exitosamente")
+                st.success("✅ Procesamiento finalizado con éxito.")
                 st.divider()
                 
-                # --- FILA 1: MÉTRICAS CLAVE ---
+                # --- DESCARGA DE DATOS EN EXCEL ---
+                st.subheader("💾 2. Almacenamiento y Descarga de Datos")
+                
+                # Generar archivo Excel en memoria para descarga
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    df_comentarios.to_excel(writer, sheet_name='Comentarios_Scrapeados', index=False)
+                    
+                    # Guardar resumen analítico en segunda hoja
+                    df_resumen = pd.DataFrame([{
+                        "Favorabilidad_Neta": f"{res.get('favorabilidad_neta')}%",
+                        "Nivel_Alerta": res.get("nivel_de_alerta_crisis"),
+                        "Resumen": res.get("resumen_ejecutivo"),
+                        "Recomendacion": res.get("recomendacion_estrategica")
+                    }])
+                    df_resumen.to_excel(writer, sheet_name='Resumen_Escucha', index=False)
+                
+                buffer.seek(0)
+                
+                st.download_button(
+                    label="📥 Descargar Base de Datos de Comentarios y Resultados en Excel",
+                    data=buffer,
+                    file_name="Escucha_Digital_Santa_Marta_Resultados.xlsx",
+                    mime="application/vnd.ms-excel",
+                    type="secondary"
+                )
+                
+                st.divider()
+                
+                # --- MÉTRICAS GENERALES ---
+                st.subheader("📈 3. Tablero de Indicadores Políticos")
                 c1, c2, c3, c4 = st.columns(4)
                 
-                fav = resultado.get("favorabilidad_neta", 0)
-                sent = resultado.get("distribucion_sentimiento", {})
-                alerta = resultado.get("nivel_de_alerta_crisis", 1)
+                fav = res.get("favorabilidad_neta", 0)
+                sent = res.get("distribucion_sentimiento", {})
+                alerta = res.get("nivel_de_alerta_crisis", 1)
                 
                 with c1:
-                    st.metric("Índice de Favorabilidad Neta", f"{fav}%", delta=f"{fav}%", delta_color="normal")
+                    st.metric("Favorabilidad Neta", f"{fav}%")
                 with c2:
                     st.metric("Sentimiento Negativo", f"{sent.get('Negativo', 0)}%")
                 with c3:
                     st.metric("Sentimiento Positivo", f"{sent.get('Positivo', 0)}%")
                 with c4:
-                    color_alerta = "🔴 High" if alerta >= 4 else ("🟡 Medium" if alerta >= 3 else "🟢 Low")
-                    st.metric("Nivel de Alerta de Crisis", f"{alerta} / 5", delta=color_alerta, delta_color="inverse")
+                    label_crisis = "🔴 Severa (4-5)" if alerta >= 4 else "🟡 Moderada (3)" if alerta == 3 else "🟢 Normal (1-2)"
+                    st.metric("Nivel de Alerta de Crisis", label_crisis)
                 
-                st.divider()
+                # --- GRÁFICOS ---
+                col_g1, col_g2 = st.columns(2)
                 
-                # --- FILA 2: GRÁFICOS INTERACTIVOS ---
-                col_graf1, col_graf2 = st.columns(2)
-                
-                with col_graf1:
-                    st.subheader("📊 Distribución de Sentimiento")
-                    df_sent = pd.DataFrame({
-                        "Sentimiento": list(sent.keys()),
-                        "Porcentaje": list(sent.values())
-                    })
-                    fig_pie = px.pie(
+                with col_g1:
+                    st.markdown("#### Balance de Sentimiento")
+                    df_sent = pd.DataFrame({"Sentimiento": list(sent.keys()), "Porcentaje": list(sent.values())})
+                    fig1 = px.pie(
                         df_sent, values="Porcentaje", names="Sentimiento",
                         color="Sentimiento",
                         color_discrete_map={"Positivo": "#5CB85C", "Negativo": "#D9534F", "Neutro": "#A6ACAF"},
                         hole=0.4
                     )
-                    st.plotly_chart(fig_pie, use_container_width=True)
-                
-                with col_graf2:
-                    st.subheader("🔥 Focos Críticos / Problemáticas Detectadas")
-                    focos = resultado.get("focos_criticos", [])
+                    st.plotly_chart(fig1, use_container_width=True)
+                    
+                with col_g2:
+                    st.markdown("#### Focos Críticos Detectados")
+                    focos = res.get("focos_criticos", [])
                     if focos:
                         df_focos = pd.DataFrame(focos)
-                        fig_bar = px.bar(
+                        fig2 = px.bar(
                             df_focos, x="menciones_pct", y="categoria", orientation="h",
                             labels={"menciones_pct": "% Menciones", "categoria": "Problemática"},
                             color_discrete_sequence=["#1B365D"]
                         )
-                        fig_bar.update_layout(yaxis={'categoryorder':'total ascending'})
-                        st.plotly_chart(fig_bar, use_container_width=True)
+                        fig2.update_layout(yaxis={'categoryorder':'total ascending'})
+                        st.plotly_chart(fig2, use_container_width=True)
                 
-                st.divider()
-                
-                # --- FILA 3: DIAGNÓSTICO Y RECOMENDACIÓN ESTRATÉGICA ---
-                col_diag1, col_diag2 = st.columns(2)
-                
-                with col_diag1:
-                    st.subheader("📋 Resumen Ejecutivo de la Escucha")
-                    st.info(resultado.get("resumen_ejecutivo", "Sin resumen disponible."))
-                    
-                with col_diag2:
-                    st.subheader("💡 Recomendación Estratégica")
-                    st.warning(resultado.get("recomendacion_estrategica", "Sin recomendación disponible."))
+                # --- DIAGNÓSTICO Y RECOMENDACIONES ---
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    st.info(f"**📋 Resumen Ejecutivo:**\n\n{res.get('resumen_ejecutivo')}")
+                with col_d2:
+                    st.warning(f"**💡 Recomendación Estratégica:**\n\n{res.get('recomendacion_estrategica')}")
                     
             except Exception as e:
-                st.error(f"❌ Ocurrió un error al procesar la solicitud: {str(e)}")
+                st.error(f"❌ Error durante el procesamiento: {str(e)}")
                 
                 
                 
