@@ -93,7 +93,8 @@ btn_procesar = st.button("🚀 Ejecutar Scraping, Procesar y Analizar Escucha Di
 # -----------------------------------------------------------------------------
 def procesar_escucha_digital(texto, key):
     # Iniciar cliente oficial con el modelo gemini-1.5-flash
-    client = genai.Client(api_key=key)
+    clean_key = key.strip()
+    client = genai.Client(api_key=clean_key)
     
     prompt = f"""
     Actúas como un experto en Ciencia de Datos Política y Social Listening especializado en el contexto socio-político de Santa Marta, Magdalena, Colombia.
