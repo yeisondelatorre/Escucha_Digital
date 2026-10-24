@@ -6,3 +6,5 @@ numpy
 joblib
 plotly
 google-genai
+xlsxwriter
+openpyxl
