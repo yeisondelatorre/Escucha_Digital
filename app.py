@@ -3,44 +3,15 @@ import pandas as pd
 import plotly.express as px
 import json
 import io
-import os
-import base64
-import time
 from google import genai
 from google.genai import types
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN AUXILIAR PARA CARGAR ÍCONOS PNG EN HTML
-# -----------------------------------------------------------------------------
-def get_base64_image(image_path):
-    if os.path.exists(image_path):
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode()
-    return None
-
-def render_section_header(icon_name, title_text, size=26):
-    icon_path = os.path.join("assets", icon_name)
-    b64_str = get_base64_image(icon_path)
-    if b64_str:
-        st.markdown(
-            f'''
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 15px; margin-bottom: 10px;">
-                <img src="data:image/png;base64,{b64_str}" width="{size}" height="{size}" />
-                <span style="font-size: 22px; font-weight: bold; color: #1B365D;">{title_text}</span>
-            </div>
-            ''',
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(f"### {title_text}")
-
-# -----------------------------------------------------------------------------
 # CONFIGURACIÓN DE LA PÁGINA
 # -----------------------------------------------------------------------------
-favicon_path = "assets/favicon.png"
 st.set_page_config(
     page_title="Escucha Digital Avanzada - Alcaldía de Santa Marta",
-    page_icon=favicon_path if os.path.exists(favicon_path) else "🏛️",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -53,55 +24,28 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ENCABEZADO PRINCIPAL CON LOGO CUSTOM
-logo_b64 = get_base64_image("assets/logo_alcaldia.png")
-if logo_b64:
-    st.markdown(
-        f'''
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <img src="data:image/png;base64,{logo_b64}" width="40" height="40" />
-            <p class="main-header" style="margin: 0;">Sistema Avanzado de Escucha Digital Política</p>
-        </div>
-        ''',
-        unsafe_allow_html=True
-    )
-else:
-    st.markdown('<p class="main-header">Sistema Avanzado de Escucha Digital Política</p>', unsafe_allow_html=True)
-
+st.markdown('<p class="main-header">📊 Sistema Avanzado de Escucha Digital Política</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Scraping, Procesamiento Masivo, Descarga en Excel y Analítica de Sentimiento | Santa Marta</p>', unsafe_allow_html=True)
 st.divider()
 
 # -----------------------------------------------------------------------------
-# BARRA LATERAL: CONFIGURACIÓN
+# BARRA LATERAL: CONFIGURACIÓN Y API KEY
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    config_b64 = get_base64_image("assets/config.png")
-    if config_b64:
-        st.markdown(
-            f'''
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <img src="data:image/png;base64,{config_b64}" width="22" height="22" />
-                <span style="font-size: 18px; font-weight: bold;">Configuración del Sistema</span>
-            </div>
-            ''',
-            unsafe_allow_html=True
-        )
-    else:
-        st.header("Configuración del Sistema")
-        
+    st.header("⚙️ Configuración del Sistema")
     api_key = st.text_input("Gemini API Key:", type="password", help="Ingresa tu clave de API de Google AI Studio")
     
     st.markdown("---")
-    st.subheader("Parámetros Territoriales")
+    st.subheader("📌 Parámetros Territorial")
     plataforma = st.selectbox("Canal Principal:", ["Multiplataforma (Excel/Batch)", "Facebook", "X (Twitter)", "Instagram", "WhatsApp / Dark Social"])
     territorio = st.selectbox("Zona de Cobertura:", ["Todo el Distrito", "Localidad 1 (Cultural-Tylona)", "Localidad 2 (Histórica-Rodrigo de Bastidas)", "Localidad 3 (Turística-Perla del Caribe)", "Zona Rural / Corregimientos"])
 
 # -----------------------------------------------------------------------------
-# MÓDULO DE CARGA DE DATOS
+# MÓDULO DE CARGA Y SCRAPING DE DATOS
 # -----------------------------------------------------------------------------
-render_section_header("upload.png", "1. Ingesta de Datos (Individual o Carga Masiva)")
+st.subheader("📥 1. Ingesta de Datos (Individual o Carga Masiva)")
 
-tab1, tab2 = st.tabs(["Cargar Archivo (Excel / CSV / TXT)", "Entrada Manual Directa"])
+tab1, tab2 = st.tabs(["📁 Cargar Archivo (Excel / CSV / TXT)", "✍️ Entrada Manual Directa"])
 
 df_comentarios = None
 texto_consolidado = ""
@@ -122,7 +66,7 @@ with tab1:
                 lines = [line.strip() for line in string_data.split("\n") if line.strip()]
                 df_input = pd.DataFrame({"Comentarios_o_URL": lines})
             
-            st.success(f"Archivo cargado exitosamente. Se detectaron {len(df_input)} registros.")
+            st.success(f"📂 Archivo cargado exitosamente. Se detectaron {len(df_input)} registros.")
             st.dataframe(df_input.head(5), use_container_width=True)
             
             col_target = st.selectbox("Selecciona la columna que contiene los comentarios o URLs:", df_input.columns)
@@ -142,10 +86,10 @@ with tab2:
         df_comentarios = pd.DataFrame({"Comentario": lines})
         texto_consolidado = texto_manual
 
-btn_procesar = st.button("Ejecutar Procesamiento y Analítica de Escucha Digital", type="primary", use_container_width=True)
+btn_procesar = st.button("🚀 Ejecutar Scraping, Procesar y Analizar Escucha Digital", type="primary", use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN MOTOR NLP CON MANEJO DE RETRY Y FALLBACK POR ERROR 503
+# FUNCIÓN MOTOR NLP (GEMINI 3.8 FLASH)
 # -----------------------------------------------------------------------------
 def procesar_escucha_digital(texto, key):
     clean_key = key.strip()
@@ -181,49 +125,33 @@ def procesar_escucha_digital(texto, key):
     "{texto[:15000]}"
     """
     
-    # Lista de modelos ordenada por prioridad
-    modelos_disponibles = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    response = client.models.generate_content(
+        model='gemini-3.8-flash',
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json"
+        )
+    )
     
-    last_exception = None
-    for model_name in modelos_disponibles:
-        # Reintentos por modelo en caso de saturación 503
-        for intento in range(2):
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json"
-                    )
-                )
-                return json.loads(response.text)
-            except Exception as e:
-                last_exception = e
-                err_msg = str(e).lower()
-                if '503' in err_msg or 'unavailable' in err_msg:
-                    time.sleep(1.5)  # Esperar brevemente antes de reintentar
-                else:
-                    break  # Si es otro error (ej. sintaxis), pasar al siguiente modelo
-                    
-    raise last_exception
+    return json.loads(response.text)
 
 # -----------------------------------------------------------------------------
 # RESULTADOS Y DESCARGA DE EXCEL
 # -----------------------------------------------------------------------------
 if btn_procesar:
     if not api_key:
-        st.error("Por favor ingresa tu Gemini API Key en la barra lateral.")
+        st.error("⚠️ Por favor ingresa tu Gemini API Key en la barra lateral.")
     elif df_comentarios is None or df_comentarios.empty:
-        st.warning("Debes subir un archivo o ingresar texto para analizar.")
+        st.warning("⚠️ Debes subir un archivo o ingresar texto para analizar.")
     else:
-        with st.spinner("Procesando datos, aplicando modelos NLP y estructurando informe..."):
+        with st.spinner("⏳ Procesando datos, aplicando modelos NLP y estructurando informe..."):
             try:
                 res = procesar_escucha_digital(texto_consolidado, api_key)
                 
-                st.success("Procesamiento finalizado con éxito.")
+                st.success("✅ Procesamiento finalizado con éxito.")
                 st.divider()
                 
-                render_section_header("download.png", "2. Almacenamiento y Descarga de Datos")
+                st.subheader("💾 2. Almacenamiento y Descarga de Datos")
                 
                 buffer = io.BytesIO()
                 with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
@@ -240,7 +168,7 @@ if btn_procesar:
                 buffer.seek(0)
                 
                 st.download_button(
-                    label="Descargar Informe de Resultados en Excel",
+                    label="📥 Descargar Base de Datos de Comentarios y Resultados en Excel",
                     data=buffer,
                     file_name="Escucha_Digital_Santa_Marta_Resultados.xlsx",
                     mime="application/vnd.ms-excel",
@@ -249,7 +177,7 @@ if btn_procesar:
                 
                 st.divider()
                 
-                render_section_header("analytics.png", "3. Tablero de Indicadores Políticos")
+                st.subheader("📈 3. Tablero de Indicadores Políticos")
                 c1, c2, c3, c4 = st.columns(4)
                 
                 fav = res.get("favorabilidad_neta", 0)
@@ -263,7 +191,7 @@ if btn_procesar:
                 with c3:
                     st.metric("Sentimiento Positivo", f"{sent.get('Positivo', 0)}%")
                 with c4:
-                    label_crisis = "Severa (4-5)" if alerta >= 4 else "Moderada (3)" if alerta == 3 else "Normal (1-2)"
+                    label_crisis = "🔴 Severa (4-5)" if alerta >= 4 else "🟡 Moderada (3)" if alerta == 3 else "🟢 Normal (1-2)"
                     st.metric("Nivel de Alerta de Crisis", label_crisis)
                 
                 col_g1, col_g2 = st.columns(2)
@@ -294,9 +222,9 @@ if btn_procesar:
                 
                 col_d1, col_d2 = st.columns(2)
                 with col_d1:
-                    st.info(f"**Resumen Ejecutivo:**\n\n{res.get('resumen_ejecutivo')}")
+                    st.info(f"**📋 Resumen Ejecutivo:**\n\n{res.get('resumen_ejecutivo')}")
                 with col_d2:
-                    st.warning(f"**Recomendación Estratégica:**\n\n{res.get('recomendacion_estrategica')}")
+                    st.warning(f"**💡 Recomendación Estratégica:**\n\n{res.get('recomendacion_estrategica')}")
                     
             except Exception as e:
-                st.error(f"Error durante el procesamiento: {str(e)}")
+                st.error(f"❌ Error durante el procesamiento: {str(e)}")
