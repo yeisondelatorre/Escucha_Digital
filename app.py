@@ -227,4 +227,4 @@ if btn_procesar:
                     st.warning(f"**💡 Recomendación Estratégica:**\n\n{res.get('recomendacion_estrategica')}")
                     
             except Exception as e:
-                st.error(f"❌ Error durante el procesamiento: {str(e
+                st.error(f"❌ Error durante el procesamiento: {str(e)}")
