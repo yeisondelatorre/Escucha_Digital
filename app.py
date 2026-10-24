@@ -48,6 +48,7 @@ st.subheader("📥 1. Ingesta de Datos (Individual o Carga Masiva)")
 tab1, tab2 = st.tabs(["📁 Cargar Archivo (Excel / CSV / TXT)", "✍️ Entrada Manual Directa"])
 
 df_comentarios = None
+texto_consolidado = ""
 
 with tab1:
     uploaded_file = st.file_uploader(
@@ -88,7 +89,7 @@ with tab2:
 btn_procesar = st.button("🚀 Ejecutar Scraping, Procesar y Analizar Escucha Digital", type="primary", use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN MOTOR NLP (GEMINI 2.0 FLASH)
+# FUNCIÓN MOTOR NLP (GEMINI 3.8 FLASH)
 # -----------------------------------------------------------------------------
 def procesar_escucha_digital(texto, key):
     clean_key = key.strip()
@@ -124,7 +125,7 @@ def procesar_escucha_digital(texto, key):
     "{texto[:15000]}"
     """
     
-response = client.models.generate_content(
+    response = client.models.generate_content(
         model='gemini-3.8-flash',
         contents=prompt,
         config=types.GenerateContentConfig(
@@ -226,4 +227,4 @@ if btn_procesar:
                     st.warning(f"**💡 Recomendación Estratégica:**\n\n{res.get('recomendacion_estrategica')}")
                     
             except Exception as e:
-                st.error(f"❌ Error durante el procesamiento: {str(e)}")
+                st.error(f"❌ Error durante el procesamiento: {str(e
