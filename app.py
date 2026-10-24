@@ -68,7 +68,6 @@ with tab1:
             st.success(f"📂 Archivo cargado exitosamente. Se detectaron {len(df_input)} registros.")
             st.dataframe(df_input.head(5), use_container_width=True)
             
-            # Unificar texto para el análisis
             col_target = st.selectbox("Selecciona la columna que contiene los comentarios o URLs:", df_input.columns)
             texto_consolidado = " ".join(df_input[col_target].astype(str).tolist())
             df_comentarios = df_input
@@ -89,10 +88,9 @@ with tab2:
 btn_procesar = st.button("🚀 Ejecutar Scraping, Procesar y Analizar Escucha Digital", type="primary", use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# FUNCIÓN MOTOR NLP (GEMINI 1.5 FLASH)
+# FUNCIÓN MOTOR NLP (GEMINI 2.0 FLASH)
 # -----------------------------------------------------------------------------
 def procesar_escucha_digital(texto, key):
-    # Iniciar cliente oficial con el modelo gemini-1.5-flash
     clean_key = key.strip()
     client = genai.Client(api_key=clean_key)
     
@@ -127,7 +125,7 @@ def procesar_escucha_digital(texto, key):
     """
     
     response = client.models.generate_content(
-        model='gemini-1.5-flash',
+        model='gemini-2.0-flash',
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json"
@@ -152,15 +150,12 @@ if btn_procesar:
                 st.success("✅ Procesamiento finalizado con éxito.")
                 st.divider()
                 
-                # --- DESCARGA DE DATOS EN EXCEL ---
                 st.subheader("💾 2. Almacenamiento y Descarga de Datos")
                 
-                # Generar archivo Excel en memoria para descarga
                 buffer = io.BytesIO()
                 with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                     df_comentarios.to_excel(writer, sheet_name='Comentarios_Scrapeados', index=False)
                     
-                    # Guardar resumen analítico en segunda hoja
                     df_resumen = pd.DataFrame([{
                         "Favorabilidad_Neta": f"{res.get('favorabilidad_neta')}%",
                         "Nivel_Alerta": res.get("nivel_de_alerta_crisis"),
@@ -181,7 +176,6 @@ if btn_procesar:
                 
                 st.divider()
                 
-                # --- MÉTRICAS GENERALES ---
                 st.subheader("📈 3. Tablero de Indicadores Políticos")
                 c1, c2, c3, c4 = st.columns(4)
                 
@@ -199,7 +193,6 @@ if btn_procesar:
                     label_crisis = "🔴 Severa (4-5)" if alerta >= 4 else "🟡 Moderada (3)" if alerta == 3 else "🟢 Normal (1-2)"
                     st.metric("Nivel de Alerta de Crisis", label_crisis)
                 
-                # --- GRÁFICOS ---
                 col_g1, col_g2 = st.columns(2)
                 
                 with col_g1:
@@ -226,7 +219,6 @@ if btn_procesar:
                         fig2.update_layout(yaxis={'categoryorder':'total ascending'})
                         st.plotly_chart(fig2, use_container_width=True)
                 
-                # --- DIAGNÓSTICO Y RECOMENDACIONES ---
                 col_d1, col_d2 = st.columns(2)
                 with col_d1:
                     st.info(f"**📋 Resumen Ejecutivo:**\n\n{res.get('resumen_ejecutivo')}")
@@ -235,6 +227,3 @@ if btn_procesar:
                     
             except Exception as e:
                 st.error(f"❌ Error durante el procesamiento: {str(e)}")
-                
-                
-                
