@@ -98,7 +98,7 @@ def analizar_escucha_digital(texto, key_api, canal, zona):
     """
     
     response = client.models.generate_content(
-        model='gemini-2.5-flash',
+        model='gemini-1.5-flash',
         contents=prompt_sistema,
         config=types.GenerateContentConfig(
             response_mime_type="application/json"
